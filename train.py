@@ -15,10 +15,10 @@ from utils import set_random_seed, Logger, AverageMeter, generate_adaptive_LD, g
 
 parser = argparse.ArgumentParser(description='PyTorch Training')
 # train configs
-parser.add_argument('--epochs', default=75, type=int)
+parser.add_argument('--epochs', default=100, type=int)
 parser.add_argument('--batch_size', default=64, type=int)
 parser.add_argument('--lr', default=0.001, type=float)
-parser.add_argument('--num_classes', default=7, type=int)
+parser.add_argument('--num_classes', default=8, type=int)
 parser.add_argument('--num_samples', default=30000, type=int)
 # method configs
 parser.add_argument('--threshold', default=0.7, type=float)
@@ -35,8 +35,8 @@ parser.add_argument('--tops', default=0.7, type=float)
 parser.add_argument('--margin_1', default=0.07, type=float)
 # common configs
 parser.add_argument('--seed', default=None, type=int)
-parser.add_argument('--dataset', default='raf', type=str)
-parser.add_argument('--data_path', default='./datasets/raf-basic', type=str)
+parser.add_argument('--dataset', default='affectnet', type=str)
+parser.add_argument('--data_path', default='./datasets/affectnet', type=str)
 parser.add_argument('--num_workers', default=16, type=int)
 parser.add_argument('--device_id', default=0, type=int)
 
@@ -166,7 +166,7 @@ def train(train_loader, model, criterion, criterion_kld, optimizer, LD, epoch):
         images = images.to(device)
         labels = labels.to(device)
 
-        if args.dataset == 'sfew':
+        if args.dataset in ['sfew', 'FER-2013', 'FERPlus']:
             batch_size, ncrops, c, h, w = images.shape
             images = images.view(-1, c, h, w)
             labels = torch.repeat_interleave(labels, repeats=ncrops, dim=0)
@@ -236,17 +236,17 @@ def validate(test_loader, model, criterion, epoch, phase='train'):
         for i, (inputs, targets, indexes) in pbar:
             inputs, targets = inputs.to(device), targets.to(device)
 
-            if args.dataset == 'sfew':
+            if args.dataset in ['sfew', 'FER-2013', 'FERPlus']:
                 batch_size, ncrops, c, h, w = inputs.shape
                 inputs = inputs.view(-1, c, h, w)
 
             if phase == 'train':
-                if args.dataset == 'sfew':
+                if args.dataset in ['sfew', 'FER-2013', 'FERPlus']:
                     targets = torch.repeat_interleave(targets, repeats=ncrops, dim=0)
                 outputs, _, attention_weights = model(inputs)
             else:
                 _, outputs, attention_weights = model(inputs)
-                if args.dataset == 'sfew':
+                if args.dataset in ['sfew', 'FER-2013', 'FERPlus']:
                     outputs = outputs.view(batch_size, ncrops, -1)
                     outputs = torch.sum(outputs, dim=1) / ncrops
 

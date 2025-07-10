@@ -120,4 +120,4 @@ def save_checkpoint(state, is_best, checkpoint='./checkpoints', filename='checkp
     filepath = os.path.join(checkpoint, filename)
     torch.save(state, filepath)
     if is_best:
-        shutil.copyfile(filepath, os.path.join(checkpoint, 'model_best.pth.tar'))
+        shutil.copyfile(filepath, os.path.join(checkpoint, 'model_best_AffectNet.pth.tar'))

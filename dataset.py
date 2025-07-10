@@ -12,6 +12,8 @@ import torchvision.transforms as transforms
 
 from auto_augment import rand_augment_transform
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 只显示 warning 和 error
+
 class CustomDownSampler(torch.utils.data.sampler.Sampler):
     def __init__(self, dataset):
         self.labels = np.array(dataset.label)
@@ -78,7 +80,7 @@ class RafDataset(Dataset):
         return image, label, idx
 
 # AffectNet Dataset
-class AffectDataset_7label(Dataset):
+class AffectDataset_label(Dataset):
     def __init__(self, aff_path, phase, use_cache = True, transform = None):
         self.phase = phase
         self.transform = transform
@@ -96,12 +98,12 @@ class AffectDataset_7label(Dataset):
 
         self.data = df[df['phase'] == phase]
 
-        self.file_paths = self.data.loc[:, 'img_path'].values
+        self.file_paths = self.data.loc[:, 'image_path'].values
         self.label = self.data.loc[:, 'label'].values
 
         self.file_paths = np.array(self.file_paths)
         self.label = np.array(self.label)
-        idxs = np.where(self.label!=7)[0]
+        idxs = np.where(self.label!=8)[0]
         self.file_paths = self.file_paths[idxs].tolist()
         self.label = self.label[idxs].tolist()
 
@@ -152,12 +154,81 @@ class SFEWDataset(torchvision.datasets.ImageFolder):
             image = self.transform(image)
 
         return image, label, idx
+    
+class FER2013Dataset(torchvision.datasets.ImageFolder):
+    def __init__(self, fer2013_path, phase, transform=None):
+        if phase == 'train':
+            root_dir = os.path.join(fer2013_path, 'train')
+        else:
+            root_dir = os.path.join(fer2013_path, 'val')
+        super().__init__(root=root_dir, transform=transform)
 
-def get_dataloaders(dataset='raf', data_path='./datasets/raf-basic', batch_size=64, num_workers=2, num_samples=30000):
+    def __getitem__(self, idx):
+        path, label = self.samples[idx]
+        image = self.loader(path)  # 默认用的是 PIL.Image.open
+        if self.transform is not None:
+            image = self.transform(image)
+        return image, label, idx
+
+class FERPlusDataset(torchvision.datasets.ImageFolder):
+    def __init__(self, ferplus_path, phase, transform=None):
+        if phase == 'train':
+            root_dir = os.path.join(ferplus_path, 'train')
+        else:
+            root_dir = os.path.join(ferplus_path, 'val')
+        super().__init__(root=root_dir, transform=transform)
+
+    def __getitem__(self, idx):
+        path, label = self.samples[idx]
+        image = self.loader(path)  # 默认用的是 PIL.Image.open
+        if self.transform is not None:
+            image = self.transform(image)
+        return image, label, idx
+    
+class NormalizeCrops:
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensors):
+        return torch.stack([transforms.Normalize(mean=self.mean, std=self.std)(t) for t in tensors])
+    
+class ApplyRandAugment:
+    def __init__(self):
+        self.transform_fn = rand_augment_transform(
+            config_str='rand-m3-n5-mstd0.5',
+            hparams={'translate_const': 117, 'img_mean': (124, 116, 104)}
+        )
+
+    def __call__(self, crops):
+        return torch.stack([transforms.ToTensor()(self.transform_fn(crop)) for crop in crops])
+
+
+class ApplyHorizontalFlip:
+    def __call__(self, crops):
+        return torch.stack([transforms.RandomHorizontalFlip()(crop) for crop in crops])
+
+class ApplyRandomErasing:
+    def __call__(self, tensors):
+        return torch.stack([transforms.RandomErasing(scale=(0.02, 0.25))(t) for t in tensors])
+
+class ToTensorCrops:
+    def __call__(self, crops):
+        return torch.stack([transforms.ToTensor()(crop) for crop in crops])
+
+class NormalizeCrops:
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensors):
+        return torch.stack([transforms.Normalize(mean=self.mean, std=self.std)(t) for t in tensors])
+
+def get_dataloaders(dataset='affectnet', data_path='./datasets/affectnet', batch_size=64, num_workers=0, num_samples=30000):
     # transforms 
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225) 
-    if dataset in ['raf', 'affectnet7']:
+    if dataset in ['raf', 'affectnet']:
         data_transforms = transforms.Compose([
             transforms.Resize((224, 224)),
             rand_augment_transform(config_str='rand-m5-n3-mstd0.5', hparams={'translate_const': 117, 'img_mean': (124, 116, 104)}),
@@ -171,35 +242,35 @@ def get_dataloaders(dataset='raf', data_path='./datasets/raf-basic', batch_size=
             transforms.ToTensor(),
             transforms.Normalize(mean=mean, std=std),
             ])
-    elif dataset == 'sfew':
+    elif dataset in ['sfew', 'FER-2013', 'FERPlus']: 
         data_transforms = transforms.Compose([
             transforms.Resize(256),
-            transforms.TenCrop(224),      
-            transforms.Lambda(lambda crops: torch.stack(
-                [transforms.ToTensor()(rand_augment_transform(config_str='rand-m3-n5-mstd0.5',hparams={'translate_const': 117, 'img_mean': (124, 116, 104)})(crop)) for crop in crops])),
-            transforms.Lambda(lambda crops: torch.stack(
-                [transforms.RandomHorizontalFlip()(crop) for crop in crops])),        
-            transforms.Lambda(lambda tensors: torch.stack(
-                [transforms.Normalize(mean=mean, std=std)(t) for t in tensors])),
-            transforms.Lambda(lambda tensors: torch.stack(
-                [transforms.RandomErasing(scale=(0.02, 0.25))(t) for t in tensors])),
-            ])
+            transforms.TenCrop(224),
+            transforms.Lambda(ApplyRandAugment()),
+            transforms.Lambda(ApplyHorizontalFlip()),
+            transforms.Lambda(NormalizeCrops(mean, std)),
+            transforms.Lambda(ApplyRandomErasing()),
+        ])
+
+
         data_transforms_val = transforms.Compose([
             transforms.Resize(256),
             transforms.TenCrop(224),
-            transforms.Lambda(lambda crops: torch.stack(
-                [transforms.ToTensor()(crop) for crop in crops])),
-            transforms.Lambda(lambda tensors: torch.stack(
-                [transforms.Normalize(mean=mean, std=std)(t) for t in tensors])),
-            ])
+            ToTensorCrops(),
+            NormalizeCrops(mean, std),
+        ])
 
     # datasets
     if dataset == 'raf':
         dataset = RafDataset
-    elif dataset == 'affectnet7':
-        dataset = AffectDataset_7label
+    elif dataset == 'affectnet':
+        dataset = AffectDataset_label
     elif dataset == 'sfew':
         dataset = SFEWDataset
+    elif dataset == 'FER-2013':
+        dataset = FER2013Dataset
+    elif dataset == 'FERPlus':
+        dataset = FERPlusDataset
 
     train_dataset = dataset(
         data_path,
@@ -213,7 +284,7 @@ def get_dataloaders(dataset='raf', data_path='./datasets/raf-basic', batch_size=
     )
 
     # dataloaders
-    if dataset in [AffectDataset_7label]:
+    if dataset in [AffectDataset_label]:
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
