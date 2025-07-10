@@ -166,7 +166,7 @@ def train(train_loader, model, criterion, criterion_kld, optimizer, LD, epoch):
         images = images.to(device)
         labels = labels.to(device)
 
-        if args.dataset in ['sfew', 'FER-2013', 'FERPlus']:
+        if args.dataset in ['AffectNet', 'FER-2013', 'FERPlus']:
             batch_size, ncrops, c, h, w = images.shape
             images = images.view(-1, c, h, w)
             labels = torch.repeat_interleave(labels, repeats=ncrops, dim=0)
@@ -236,17 +236,17 @@ def validate(test_loader, model, criterion, epoch, phase='train'):
         for i, (inputs, targets, indexes) in pbar:
             inputs, targets = inputs.to(device), targets.to(device)
 
-            if args.dataset in ['sfew', 'FER-2013', 'FERPlus']:
+            if args.dataset in ['AffectNet', 'FER-2013', 'FERPlus']:
                 batch_size, ncrops, c, h, w = inputs.shape
                 inputs = inputs.view(-1, c, h, w)
 
             if phase == 'train':
-                if args.dataset in ['sfew', 'FER-2013', 'FERPlus']:
+                if args.dataset in ['AffectNet', 'FER-2013', 'FERPlus']:
                     targets = torch.repeat_interleave(targets, repeats=ncrops, dim=0)
                 outputs, _, attention_weights = model(inputs)
             else:
                 _, outputs, attention_weights = model(inputs)
-                if args.dataset in ['sfew', 'FER-2013', 'FERPlus']:
+                if args.dataset in ['AffectNet', 'FER-2013', 'FERPlus']:
                     outputs = outputs.view(batch_size, ncrops, -1)
                     outputs = torch.sum(outputs, dim=1) / ncrops
 
