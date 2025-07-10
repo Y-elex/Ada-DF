@@ -80,63 +80,19 @@ class RafDataset(Dataset):
         return image, label, idx
 
 # AffectNet Dataset
-class AffectDataset_label(Dataset):
-    def __init__(self, aff_path, phase, use_cache = True, transform = None):
-        self.phase = phase
-        self.transform = transform
-        self.aff_path = aff_path
-        
-        if use_cache:
-            cache_path = os.path.join(aff_path,'affectnet.csv')
-            if os.path.exists(cache_path):
-                df = pd.read_csv(cache_path)
-            else:
-                df = self.get_df()
-                df.to_csv(cache_path)
+class AffectDataset(torchvision.datasets.ImageFolder):
+    def __init__(self, AffectNet_path, phase, transform=None):
+        if phase == 'train':
+            root_dir = os.path.join(AffectNet_path, 'train')
         else:
-            df = self.get_df()
-
-        self.data = df[df['phase'] == phase]
-
-        self.file_paths = self.data.loc[:, 'image_path'].values
-        self.label = self.data.loc[:, 'label'].values
-
-        self.file_paths = np.array(self.file_paths)
-        self.label = np.array(self.label)
-        idxs = np.where(self.label!=8)[0]
-        self.file_paths = self.file_paths[idxs].tolist()
-        self.label = self.label[idxs].tolist()
-
-    def get_df(self):
-        train_path = os.path.join(self.aff_path, 'train_set/')
-        val_path = os.path.join(self.aff_path, 'val_set/')
-        data = []
-        
-        for anno in glob.glob(train_path + 'annotations/*_exp.npy'):
-            idx = os.path.basename(anno).split('_')[0]
-            img_path = os.path.join(train_path, f'images/{idx}.jpg')
-            label = int(np.load(anno))
-            data.append(['train', img_path, label])
-        
-        for anno in glob.glob(val_path + 'annotations/*_exp.npy'):
-            idx = os.path.basename(anno).split('_')[0]
-            img_path = os.path.join(val_path, f'images/{idx}.jpg')
-            label = int(np.load(anno))
-            data.append(['val', img_path, label])
-        
-        return pd.DataFrame(data = data,columns = ['phase', 'img_path', 'label'])
-        
-    def __len__(self):
-        return len(self.file_paths)
+            root_dir = os.path.join(AffectNet_path, 'val')
+        super().__init__(root=root_dir, transform=transform)
 
     def __getitem__(self, idx):
-        path = self.file_paths[idx]
-        image = Image.open(path).convert('RGB')
-        label = self.label[idx]
-
+        path, label = self.samples[idx]
+        image = self.loader(path)  # 默认用的是 PIL.Image.open
         if self.transform is not None:
             image = self.transform(image)
-        
         return image, label, idx
 
 # SFEW Dataset
@@ -224,11 +180,11 @@ class NormalizeCrops:
     def __call__(self, tensors):
         return torch.stack([transforms.Normalize(mean=self.mean, std=self.std)(t) for t in tensors])
 
-def get_dataloaders(dataset='affectnet', data_path='./datasets/affectnet', batch_size=64, num_workers=0, num_samples=30000):
+def get_dataloaders(dataset='AffectNet', data_path='./datasets/AffectNet', batch_size=64, num_workers=0, num_samples=30000):
     # transforms 
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225) 
-    if dataset in ['raf', 'affectnet']:
+    if dataset in ['raf']:
         data_transforms = transforms.Compose([
             transforms.Resize((224, 224)),
             rand_augment_transform(config_str='rand-m5-n3-mstd0.5', hparams={'translate_const': 117, 'img_mean': (124, 116, 104)}),
@@ -242,7 +198,7 @@ def get_dataloaders(dataset='affectnet', data_path='./datasets/affectnet', batch
             transforms.ToTensor(),
             transforms.Normalize(mean=mean, std=std),
             ])
-    elif dataset in ['sfew', 'FER-2013', 'FERPlus']: 
+    elif dataset in ['AffectNet', 'FER-2013', 'FERPlus']: 
         data_transforms = transforms.Compose([
             transforms.Resize(256),
             transforms.TenCrop(224),
@@ -263,8 +219,8 @@ def get_dataloaders(dataset='affectnet', data_path='./datasets/affectnet', batch
     # datasets
     if dataset == 'raf':
         dataset = RafDataset
-    elif dataset == 'affectnet':
-        dataset = AffectDataset_label
+    elif dataset == 'AffectNet':
+        dataset = AffectDataset
     elif dataset == 'sfew':
         dataset = SFEWDataset
     elif dataset == 'FER-2013':
@@ -284,24 +240,14 @@ def get_dataloaders(dataset='affectnet', data_path='./datasets/affectnet', batch
     )
 
     # dataloaders
-    if dataset in [AffectDataset_label]:
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=batch_size,
-            num_workers=num_workers,
-            drop_last=True,
-            persistent_workers=True,
-            sampler=CustomDownSampler(train_dataset)
-        )
-    else:
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=batch_size,
-            num_workers=num_workers,
-            shuffle=True, 
-            drop_last=True,
-            persistent_workers=True,
-        )
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        shuffle=True, 
+        drop_last=True,
+        persistent_workers=True,
+    )
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
