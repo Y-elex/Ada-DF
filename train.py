@@ -12,6 +12,7 @@ from tqdm import tqdm
 from dataset import get_dataloaders
 from model import create_model
 from utils import set_random_seed, Logger, AverageMeter, generate_adaptive_LD, generate_average_weights, get_accuracy, save_checkpoint
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description='PyTorch Training')
 # train configs
@@ -56,6 +57,12 @@ def main():
     global best_acc
     global best_epoch
     global device
+    train_acc_list = []
+    test_acc_list = []
+    train_loss_list = []
+    test_loss_list = []
+    epoch_list = []
+
 
     # log file
     logger = Logger('./results/log-'+time.strftime('%b%d_%H-%M-%S')+'.txt')
@@ -136,8 +143,40 @@ def main():
             'class_distributions': LD.detach(),
             }, 
             is_best)
+        train_acc_list.append(train_acc)
+        test_acc_list.append(test_acc)
+        train_loss_list.append(train_loss)
+        test_loss_list.append(test_loss)
+        epoch_list.append(epoch)
+
 
         scheduler.step()
+        plt.figure(figsize=(12, 5))
+
+        # 准确率图
+        plt.subplot(1, 2, 1)
+        plt.plot(epoch_list, train_acc_list, label='Train Accuracy')
+        plt.plot(epoch_list, test_acc_list, label='Test Accuracy')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy (%)')
+        plt.title('Epoch vs Accuracy')
+        plt.legend()
+        plt.grid(True)
+
+        # 损失图
+        plt.subplot(1, 2, 2)
+        plt.plot(epoch_list, train_loss_list, label='Train Loss')
+        plt.plot(epoch_list, test_loss_list, label='Test Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Epoch vs Loss')
+        plt.legend()
+        plt.grid(True)
+
+        plt.tight_layout()
+        plt.savefig('results/accuracy_loss_plot.png')
+        plt.show()
+
 
 def train(train_loader, model, criterion, criterion_kld, optimizer, LD, epoch):
     if args.alpha is not None:
