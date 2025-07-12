@@ -152,30 +152,41 @@ def main():
 
         scheduler.step()
         plt.figure(figsize=(12, 5))
+    # 创建一个 DataFrame
+    df = pd.DataFrame({
+        'epoch': epoch_list,
+        'train_acc': train_acc_list,
+        'val_acc': val_acc_list,
+        'train_loss': train_loss_list,
+        'val_loss': val_loss_list
+    })
 
-        # 准确率图
-        plt.subplot(1, 2, 1)
-        plt.plot(epoch_list, train_acc_list, label='Train Accuracy')
-        plt.plot(epoch_list, test_acc_list, label='Test Accuracy')
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy (%)')
-        plt.title('Epoch vs Accuracy')
-        plt.legend()
-        plt.grid(True)
+    # 保存为 Excel 文件
+    df.to_excel('training_log.xlsx', index=False)
 
-        # 损失图
-        plt.subplot(1, 2, 2)
-        plt.plot(epoch_list, train_loss_list, label='Train Loss')
-        plt.plot(epoch_list, test_loss_list, label='Test Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Epoch vs Loss')
-        plt.legend()
-        plt.grid(True)
+    # 准确率图
+    plt.subplot(1, 2, 1)
+    plt.plot(epoch_list, train_acc_list, label='Train Accuracy')
+    plt.plot(epoch_list, test_acc_list, label='Test Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy (%)')
+    plt.title('Epoch vs Accuracy')
+    plt.legend()
+    plt.grid(True)
 
-        plt.tight_layout()
-        plt.savefig('results/accuracy_loss_plot.png')
-        plt.show()
+    # 损失图
+    plt.subplot(1, 2, 2)
+    plt.plot(epoch_list, train_loss_list, label='Train Loss')
+    plt.plot(epoch_list, test_loss_list, label='Test Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Epoch vs Loss')
+    plt.legend()
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.savefig('results/accuracy_loss_plot.png')
+    plt.show()
 
 
 def train(train_loader, model, criterion, criterion_kld, optimizer, LD, epoch):
