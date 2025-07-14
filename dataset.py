@@ -180,7 +180,7 @@ class NormalizeCrops:
     def __call__(self, tensors):
         return torch.stack([transforms.Normalize(mean=self.mean, std=self.std)(t) for t in tensors])
 
-def get_dataloaders(dataset='AffectNet', data_path='./datasets/AffectNet', batch_size=64, num_workers=0, num_samples=30000):
+def get_dataloaders(dataset='AffectNet', data_path='./datasets/AffectNet', batch_size=64, num_workers=0, num_samples=30000, pin_memory=False):
     # transforms 
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225) 
