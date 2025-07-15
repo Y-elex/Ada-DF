@@ -47,7 +47,7 @@ device = torch.device(f'cuda:{args.device_id}' if torch.cuda.is_available() else
 if args.seed is not None:
     set_random_seed(args.seed)
 
-scaler = torch.cuda.amp.GradScaler()  # ✅ AMP加速器
+scaler = torch.amp.GradScaler()  # ✅ AMP加速器
 
 def main():
     best_acc = 0
@@ -115,9 +115,9 @@ def main():
     df = pd.DataFrame({
         'epoch': epoch_list,
         'train_acc': train_acc_list,
-        'val_acc': test_acc_list,
+        'test_acc': test_acc_list,
         'train_loss': train_loss_list,
-        'val_loss': test_loss_list
+        'test_loss': test_loss_list
     })
     df.to_excel('ADA-DF_training_log_FERPlus.xlsx', index=False)
 
